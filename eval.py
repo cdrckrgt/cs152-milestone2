@@ -158,29 +158,29 @@ def show_metrics(y, y_hat):
 
 if __name__ == '__main__':
 
-    # with open('./data/gab_samples.txt') as f:
-    #     analyze(f.readlines(), printToxicity=True)
+    with open('./data/gab_samples.txt') as f:
+        analyze(f.readlines(), printToxicity=True)
 
-    # with open('./data/twitter_samples.txt') as f:
-    #     analyze(f.readlines(), printToxicity=True)
+    with open('./data/twitter_samples.txt') as f:
+        analyze(f.readlines(), printToxicity=True)
 
-    # misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
+    misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
 
-    # y_hat = analyze(misclass_df.text)
-    # y = misclass_df.label
+    y_hat = analyze(misclass_df.text)
+    y = misclass_df.label
 
-    # print('gab and twitter misclasses')
-    # # we chose these misclasses to be wrong, so this is useless
-    # show_metrics(y, y_hat)
+    print('gab and twitter misclasses')
+    # we chose these misclasses to be wrong, so this is useless
+    show_metrics(y, y_hat)
 
-    # scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
+    scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
 
-    # y_hat = analyze(scraped_df.text)
-    # y = scraped_df.label
+    y_hat = analyze(scraped_df.text)
+    y = scraped_df.label
 
-    # print('scraped misclasses')
-    # # we chose these misclasses to be wrong, so this is useless
-    # show_metrics(y, y_hat)
+    print('scraped misclasses')
+    # we chose these misclasses to be wrong, so this is useless
+    show_metrics(y, y_hat)
 
 
     mod_df = pd.read_csv('./data/modified_misclass.csv', delimiter=';')
