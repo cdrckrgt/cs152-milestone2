@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
 
-def eval_text(text):
+def eval_text(text, printResponse=False):
 # This is the URL which Perspective API requests go to.
     PERSPECTIVE_URL = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
     key = "AIzaSyClfD1Tdk7gyO-1tonIDjeoQXp72g-jWmg";
@@ -40,14 +40,10 @@ def eval_text(text):
     }
     response = requests.post(url, data=json.dumps(data_dict))
     response_dict = response.json()
-    # Print the entire response dictionary.
-    # print("\"" + text + "\"")
-    # print(json.dumps(response_dict, indent=4))
+    if printResponse:
+        print("\"" + text + "\"")
+        print(json.dumps(response_dict, indent=4))
     return response_dict
-
-# Here you can add code to evaluate particular messages.
-
-
 
 
 # preprocessing taken from https://github.com/t-davidson/hate-speech-and-offensive-language/blob/master/src/Automated%20Hate%20Speech%20Detection%20and%20the%20Problem%20of%20Offensive%20Language%20Python%203.6.ipynb
@@ -83,7 +79,6 @@ def basicScore(line):
     '''
     a basic classifier uses just toxicity score
     '''
-    i = 1
     while True:
         try:
             response = eval_text(line)
@@ -91,8 +86,7 @@ def basicScore(line):
             break
         except KeyError:
             print('resource exhausted, trying again...')
-            time.sleep(i)
-            i += 1
+            time.sleep(5)
     return score
 
 attributes = ['TOXICITY', 'SEVERE_TOXICITY', 'IDENTITY_ATTACK', 'INSULT', 'PROFANITY', \
@@ -100,9 +94,8 @@ attributes = ['TOXICITY', 'SEVERE_TOXICITY', 'IDENTITY_ATTACK', 'INSULT', 'PROFA
 
 def intermediateScore(line, attributes=attributes):
     '''
-    an intermediate classifier uses an average of lots of attributes
+    an intermediate classifier uses some mixture of different attributes
     '''
-    i = 1
     while True:
         try:
             response = eval_text(line)
@@ -116,15 +109,17 @@ def intermediateScore(line, attributes=attributes):
             break
         except KeyError:
             print('resource exhausted, trying again...')
-            time.sleep(i)
-            i += 1
+            time.sleep(5)
     return score
 
 def advancedScore(line, addtributes=attributes):
     '''
     would do things like cross validation of attribute selection,
     learn best weighting of attributes for classification,
-    maybe a more advanced sentiment classification/ensemble of different sentiment classifcations
+    maybe a more advanced sentiment classification/ensemble of different sentiment classifcations,
+    all trained through supervised learning on the dataset
+
+    alas, there is no way for us to do this here easily.
     '''
     return 0
 
@@ -138,8 +133,6 @@ def analyze(lines, nb_samples=100, scoringFunc=basicScore):
     for line in lines:
         line = tokenize(preprocess(line))
         score = scoringFunc(line)
-        print(line)
-        print(score)
         scores.append(score)
         if len(scores) >= nb_samples:
             break
@@ -158,33 +151,30 @@ def show_metrics(y, y_hat):
 
 if __name__ == '__main__':
 
-    with open('./data/gab_samples.txt') as f:
-        analyze(f.readlines(), printToxicity=True)
+    # with open('./data/gab_samples.txt') as f:
+    #     analyze(f.readlines())
 
-    with open('./data/twitter_samples.txt') as f:
-        analyze(f.readlines(), printToxicity=True)
+    # with open('./data/twitter_samples.txt') as f:
+    #     analyze(f.readlines())
 
-    misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
+    # misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
+    # y_hat = analyze(misclass_df.text)
+    # y = misclass_df.label
+    # print('gab and twitter misclasses')
+    # # we chose these misclasses to be wrong, so this is useless
+    # show_metrics(y, y_hat)
 
-    y_hat = analyze(misclass_df.text)
-    y = misclass_df.label
+    # scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
+    # y_hat = analyze(scraped_df.text)
+    # y = scraped_df.label
+    # print('scraped misclasses')
+    # # we chose these misclasses to be wrong, so this is useless
+    # show_metrics(y, y_hat)
 
-    print('gab and twitter misclasses')
-    # we chose these misclasses to be wrong, so this is useless
-    show_metrics(y, y_hat)
+    # mod_df = pd.read_csv('./data/modified_misclass.csv', delimiter=';')
+    # y_hat = analyze(mod_df.text, scoringFunc=lambda x : intermediateScore(x, ['INFLAMMATORY']))
+    # y = mod_df.label
+    # # now ideally this is good, since we modified the text to be more easily classified
+    # show_metrics(y, y_hat)
 
-    scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
-
-    y_hat = analyze(scraped_df.text)
-    y = scraped_df.label
-
-    print('scraped misclasses')
-    # we chose these misclasses to be wrong, so this is useless
-    show_metrics(y, y_hat)
-
-
-    mod_df = pd.read_csv('./data/modified_misclass.csv', delimiter=';')
-    y_hat = analyze(mod_df.text, scoringFunc=intermediateScore)
-    y = mod_df.label
-    # now ideally this is good, since we modified the text to be more easily classified
-    show_metrics(y, y_hat)
+    eval_text("i don't give a fuck how much it's snowing, i will brave a blizzard to go take care of you", printResponse=True)
