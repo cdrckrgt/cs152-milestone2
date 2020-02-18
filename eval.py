@@ -85,7 +85,6 @@ def basicScore(line):
             score = response[u'attributeScores'][u'TOXICITY'][u'summaryScore'][u'value']
             break
         except KeyError:
-            print('resource exhausted, trying again...')
             time.sleep(5)
     return score
 
@@ -108,7 +107,6 @@ def intermediateScore(line, attributes=attributes):
             score = scores / len(attributes)
             break
         except KeyError:
-            print('resource exhausted, trying again...')
             time.sleep(5)
     return score
 
@@ -123,7 +121,7 @@ def advancedScore(line, addtributes=attributes):
     '''
     return 0
 
-def analyze(lines, nb_samples=100, scoringFunc=basicScore):
+def analyze(lines, nb_samples=50, scoringFunc=basicScore):
     '''
     loop through all lines in the file
     for each line, preprocess and then find toxicity
@@ -132,6 +130,7 @@ def analyze(lines, nb_samples=100, scoringFunc=basicScore):
     scores = []
     for line in lines:
         line = tokenize(preprocess(line))
+        if line == '': continue
         score = scoringFunc(line)
         scores.append(score)
         if len(scores) >= nb_samples:
@@ -151,30 +150,43 @@ def show_metrics(y, y_hat):
 
 if __name__ == '__main__':
 
-    # with open('./data/gab_samples.txt') as f:
-    #     analyze(f.readlines())
+    with open('./data/gab_samples.txt') as f:
+        print('gab scores')
+        analyze(f.readlines())
 
-    # with open('./data/twitter_samples.txt') as f:
-    #     analyze(f.readlines())
+    with open('./data/twitter_samples.txt') as f:
+        print('twitter scores')
+        analyze(f.readlines())
 
-    # misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
-    # y_hat = analyze(misclass_df.text)
-    # y = misclass_df.label
-    # print('gab and twitter misclasses')
-    # # we chose these misclasses to be wrong, so this is useless
-    # show_metrics(y, y_hat)
+    misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
+    scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
+    combined_df = pd.concat([misclass_df, scraped_df])
 
-    # scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
-    # y_hat = analyze(scraped_df.text)
-    # y = scraped_df.label
-    # print('scraped misclasses')
-    # # we chose these misclasses to be wrong, so this is useless
-    # show_metrics(y, y_hat)
+    y_hat = analyze(combined_df.text, scoringFunc=basicScore)
+    y = combined_df.label
+    print('basicScore on combined dataset')
+    show_metrics(y, y_hat)
 
-    # mod_df = pd.read_csv('./data/modified_misclass.csv', delimiter=';')
-    # y_hat = analyze(mod_df.text, scoringFunc=lambda x : intermediateScore(x, ['INFLAMMATORY']))
-    # y = mod_df.label
-    # # now ideally this is good, since we modified the text to be more easily classified
-    # show_metrics(y, y_hat)
+    y_hat = analyze(combined_df.text, scoringFunc=intermediateScore)
+    y = combined_df.label
+    print('intermediateScore on combined dataset')
+    show_metrics(y, y_hat)
+
+    y_hat = analyze(combined_df.text, scoringFunc=lambda x : intermediateScore(x, ['INFLAMMATORY']))
+    y = combined_df.label
+    print('intermediateScore, inflammatory on combined dataset')
+    show_metrics(y, y_hat)
+
+    mod_df = pd.read_csv('./data/modified_misclass.csv', delimiter=';')
+    y_hat = analyze(mod_df.text, scoringFunc=intermediateScore)
+    y = mod_df.label
+    print('intermediateScore on modified combined dataset')
+    show_metrics(y, y_hat)
+
+    y_hat = analyze(mod_df.text, scoringFunc=lambda x : intermediateScore(x, ['INFLAMMATORY']))
+    y = mod_df.label
+    print('intermediateScore, inflammatory on modified combined dataset')
+    show_metrics(y, y_hat)
 
     eval_text("i don't give a fuck how much it's snowing, i will brave a blizzard to go take care of you", printResponse=True)
+    eval_text("that was fucking good!", printResponse=True)
