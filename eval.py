@@ -11,6 +11,9 @@ import pandas as pd
 import numpy as np
 import sklearn.metrics as metrics
 
+attributes = ['TOXICITY', 'SEVERE_TOXICITY', 'IDENTITY_ATTACK', 'INSULT', 'PROFANITY', \
+    'THREAT', 'SEXUALLY_EXPLICIT', 'INFLAMMATORY', 'OBSCENE', 'INCOHERENT', 'UNSUBSTANTIAL']
+
 def eval_text(text, printResponse=False):
 # This is the URL which Perspective API requests go to.
     PERSPECTIVE_URL = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
@@ -24,17 +27,7 @@ def eval_text(text, printResponse=False):
         # The full list can be found at: 
         # https://github.com/conversationai/perspectiveapi/blob/master/2-api/models.md
         'requestedAttributes': { 
-            'TOXICITY': {},
-            'SEVERE_TOXICITY': {},
-            'IDENTITY_ATTACK': {},
-            'INSULT': {},
-            'PROFANITY': {},
-            'THREAT': {},
-            'SEXUALLY_EXPLICIT': {},
-            'INFLAMMATORY': {},
-            'OBSCENE': {},
-            'INCOHERENT': {},
-            'UNSUBSTANTIAL': {},
+            attribute : {} for attribute in attributes
         },
         'doNotStore': True
     }
@@ -86,15 +79,14 @@ def basicScore(line):
             break
         except KeyError:
             time.sleep(5)
-    return score
+    return {'TOXICITY' : score}
 
-attributes = ['TOXICITY', 'SEVERE_TOXICITY', 'IDENTITY_ATTACK', 'INSULT', 'PROFANITY', \
-    'THREAT', 'SEXUALLY_EXPLICIT', 'INFLAMMATORY', 'OBSCENE', 'INCOHERENT', 'UNSUBSTANTIAL']
 
 def intermediateScore(line, attributes=attributes):
     '''
     an intermediate classifier uses some mixture of different attributes
     '''
+    score_dict = {}
     while True:
         try:
             response = eval_text(line)
@@ -103,12 +95,11 @@ def intermediateScore(line, attributes=attributes):
                 val = response[u'attributeScores'][attribute.decode('utf-8')][u'summaryScore'][u'value']
                 if attribute in ['INCOHERENT', 'UNSUBSTANTIAL']:
                     val = 1 - val
-                scores += val
-            score = scores / len(attributes)
+                score_dict[attribute] = val
             break
         except KeyError:
             time.sleep(5)
-    return score
+    return score_dict
 
 def advancedScore(line, addtributes=attributes):
     '''
@@ -127,16 +118,29 @@ def analyze(lines, nb_samples=50, scoringFunc=basicScore):
     for each line, preprocess and then find toxicity
     collect stats for analysis at the end of the file
     '''
-    scores = []
+    # average scores records the average attribute score for each example
+    #   will have length nb_samples or however many lines are in the file,
+    #   whichever is less
+    average_scores = []
+    # aggregate_scores records the total attribute score for each attribute
+    #   when divided by len(average_scores), gives the average attribute score
+    #   across all examples
+    aggregate_scores = {attribute : 0 for attribute in attributes}
     for line in lines:
         line = tokenize(preprocess(line))
         if line == '': continue
-        score = scoringFunc(line)
-        scores.append(score)
-        if len(scores) >= nb_samples:
+        score_dict = scoringFunc(line)
+        avg = sum([v for k, v in score_dict.iteritems()]) / len(score_dict)
+        average_scores.append(avg)
+        for k, v in score_dict.iteritems():
+            aggregate_scores[k] += v
+        if len(average_scores) >= nb_samples:
             break
-    print( stats.describe(scores) )
-    y_hat = np.array(scores) > 0.5
+    print( stats.describe(average_scores) )
+    nb_obs = len(average_scores)
+    for k, v in aggregate_scores.iteritems():
+        print('average {} score: {}'.format(k, v / nb_obs))
+    y_hat = np.array(average_scores) > 0.5
     return y_hat.astype(int)
 
 
@@ -152,15 +156,20 @@ if __name__ == '__main__':
 
     with open('./data/gab_samples.txt') as f:
         print('gab scores')
-        analyze(f.readlines())
+        analyze(f.readlines(), scoringFunc=intermediateScore)
 
     with open('./data/twitter_samples.txt') as f:
         print('twitter scores')
-        analyze(f.readlines())
+        analyze(f.readlines(), scoringFunc=intermediateScore)
 
     misclass_df = pd.read_csv('./data/misclass.csv', delimiter=';')
     scraped_df = pd.read_csv('./data/scraped_misclass.csv', delimiter=';')
     combined_df = pd.concat([misclass_df, scraped_df])
+
+    y_hat = analyze(scraped_df.text, scoringFunc=basicScore)
+    y = scraped_df.label
+    print('basicScore on scraped dataset')
+    show_metrics(y, y_hat)
 
     y_hat = analyze(combined_df.text, scoringFunc=basicScore)
     y = combined_df.label
